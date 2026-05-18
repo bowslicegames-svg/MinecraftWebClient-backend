@@ -55,8 +55,38 @@ app.get("/auth/callback", async (req, res) => {
   }
 })
 
-// KEEP SERVER ALIVE — this is what Render needs
+// Step 3: Exchange Microsoft access token for Xbox Live token
+app.post("/auth/xbl", async (req, res) => {
+  const { access_token } = req.body
+  if (!access_token) return res.status(400).json({ error: "Missing access_token" })
+
+  try {
+    const xblRes = await fetch("https://user.auth.xboxlive.com/user/authenticate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        Properties: {
+          AuthMethod: "RPS",
+          SiteName: "user.auth.xboxlive.com",
+          RpsTicket: `d=${access_token}`
+        },
+        RelyingParty: "http://auth.xboxlive.com",
+        TokenType: "JWT"
+      })
+    })
+
+    const xblJson = await xblRes.json()
+    res.json(xblJson)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: "Xbox Live auth failed" })
+  }
+})
+
+// Keep server alive on Render
 app.listen(process.env.PORT || 3000, () => {
   console.log("Auth backend running")
 })
-
