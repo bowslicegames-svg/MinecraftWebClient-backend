@@ -86,6 +86,40 @@ app.post("/auth/xbl", async (req, res) => {
   }
 })
 
+// Step 4: Exchange Xbox Live token for XSTS token
+app.post("/auth/xsts", async (req, res) => {
+  const { xbl_token, uhs } = req.body
+
+  if (!xbl_token || !uhs) {
+    return res.status(400).json({ error: "Missing xbl_token or uhs" })
+  }
+
+  try {
+    const xstsRes = await fetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        Properties: {
+          SandboxId: "RETAIL",
+          UserTokens: [xbl_token]
+        },
+        RelyingParty: "rp://api.minecraftservices.com/",
+        TokenType: "JWT"
+      })
+    })
+
+    const xstsJson = await xstsRes.json()
+    res.json(xstsJson)
+
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: "XSTS auth failed" })
+  }
+})
+
 // Keep server alive on Render
 app.listen(process.env.PORT || 3000, () => {
   console.log("Auth backend running")
