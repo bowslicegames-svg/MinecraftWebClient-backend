@@ -11,6 +11,9 @@ const CLIENT_ID = process.env.CLIENT_ID
 const CLIENT_SECRET = process.env.CLIENT_SECRET
 const REDIRECT_URI = process.env.REDIRECT_URI
 
+// Where the user should be sent after login
+const FRONTEND_RETURN = "https://bowslicegames-svg.github.io/MinecraftWebClient/"
+
 // Step 1: Redirect user to Microsoft login
 app.get("/auth/login", (req, res) => {
   const params = new URLSearchParams({
@@ -48,7 +51,21 @@ app.get("/auth/callback", async (req, res) => {
     )
 
     const tokenJson = await tokenRes.json()
-    res.json(tokenJson)
+
+    // If Microsoft returned an error, send user back with error message
+    if (tokenJson.error) {
+      return res.redirect(
+        `${FRONTEND_RETURN}?error=${encodeURIComponent(tokenJson.error_description)}`
+      )
+    }
+
+    // Redirect back to GitHub Pages with the token
+    const redirectUrl =
+      `${FRONTEND_RETURN}?ms_token=` +
+      encodeURIComponent(JSON.stringify(tokenJson))
+
+    return res.redirect(redirectUrl)
+
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: "Auth failed" })
