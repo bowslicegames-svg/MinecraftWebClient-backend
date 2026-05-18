@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MobileConfig Installer (Single File)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark light;
+      --bg: #05060a;
+      --card: #111827;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59,130,246,0.15);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --danger: #f97373;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #111827 0, #020617 55%, #000 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      padding: 16px;
+    }
+    .shell {
+      width: 100%;
+      max-width: 720px;
+      margin: auto;
+      background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(15,23,42,0.92));
+      border-radius: 24px;
+      border: 1px solid rgba(148,163,184,0.25);
+      box-shadow:
+        0 24px 80px rgba(15,23,42,0.9),
+        0 0 0 1px rgba(15,23,42,0.9);
+      padding: 18px 18px 20px;
+      backdrop-filter: blur(18px);
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 12px;
+      background: radial-gradient(circle at 30% 20%, #60a5fa, #1d4ed8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #eff6ff;
+      font-weight: 700;
+      font-size: 18px;
+      box-shadow:
+        0 0 0 1px rgba(191,219,254,0.4),
+        0 10px 25px rgba(37,99,235,0.7);
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      letter-spacing: 0.02em;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .badge {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .badge span {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34,197,94,0.25);
+    }
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin: 10px 0 14px;
+      padding: 4px;
+      border-radius: 999px;
+      background: radial-gradient(circle at top, #020617, #020617);
+      border: 1px solid rgba(148,163,184,0.35);
+    }
+    .tab {
+      border-radius: 999px;
+      padding: 7px 4px;
+      font-size: 12px;
+      text-align: center;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.16s ease-out;
+    }
+    .tab span.icon {
+      font-size: 13px;
+    }
+    .tab.active {
+      background: radial-gradient(circle at top, #1d4ed8, #1e293b);
+      color: #eff6ff;
+      box-shadow:
+        0 0 0 1px rgba(191,219,254,0.6),
+        0 10px 25px rgba(37,99,235,0.7);
+    }
+    .tab:not(.active):hover {
+      background: rgba(15,23,42,0.9);
+      color: #e5e7eb;
+    }
+    .card {
+      border-radius: var(--radius);
+      background: radial-gradient(circle at top left, #020617, #020617);
+      border: 1px solid rgba(148,163,184,0.35);
+      padding: 14px 14px 12px;
+    }
+    .card h2 {
+      margin: 0 0 4px;
+      font-size: 14px;
+      letter-spacing: 0.02em;
+    }
+    .card-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .field {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #cbd5f5;
+    }
+    input[type="file"],
+    input[type="url"],
+    textarea {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid rgba(148,163,184,0.5);
+      background: rgba(15,23,42,0.9);
+      color: var(--text);
+      font-size: 13px;
+      padding: 8px 9px;
+      outline: none;
+      transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out,
+        background 0.16s ease-out;
+    }
+    input[type="file"] {
+      padding: 6px 9px;
+    }
+    input[type="url"]:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(59,130,246,0.7);
+      background: rgba(15,23,42,0.95);
+    }
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+        "Liberation Mono", "Courier New", monospace;
+      line-height: 1.4;
+    }
+    .hint {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .btn-primary {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      background: linear-gradient(135deg, #2563eb, #4f46e5);
+      color: #eff6ff;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow:
+        0 0 0 1px rgba(191,219,254,0.7),
+        0 12px 30px rgba(37,99,235,0.8);
+      transition: transform 0.12s ease-out, box-shadow 0.12s ease-out,
+        filter 0.12s ease-out;
+    }
+    .btn-primary:active {
+      transform: translateY(1px) scale(0.99);
+      box-shadow:
+        0 0 0 1px rgba(191,219,254,0.7),
+        0 6px 16px rgba(37,99,235,0.7);
+      filter: brightness(0.97);
+    }
+    .btn-primary[disabled] {
+      opacity: 0.6;
+      cursor: default;
+      box-shadow: none;
+    }
+    .btn-secondary {
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.6);
+      padding: 6px 12px;
+      font-size: 11px;
+      background: rgba(15,23,42,0.9);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .status {
+      margin-top: 8px;
+      font-size: 11px;
+      min-height: 14px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(148,163,184,0.7);
+    }
+    .status.ok .status-dot {
+      background: #22c55e;
+      box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+    }
+    .status.err .status-dot {
+      background: var(--danger);
+      box-shadow: 0 0 0 3px rgba(248,113,113,0.25);
+    }
+    .status strong {
+      font-weight: 500;
+      color: #e5e7eb;
+    }
+    .footer {
+      margin-top: 10px;
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
+      background: rgba(15,23,42,0.9);
+    }
+    .warn {
+      color: #facc15;
+    }
+    @media (max-width: 480px) {
+      .shell { padding: 14px 12px 16px; border-radius: 20px; }
+      header { gap: 10px; }
+      .logo { width: 30px; height: 30px; font-size: 17px; }
+      h1 { font-size: 16px; }
+      .badge { display: none; }
+      .card { padding: 12px 11px 10px; }
+      .actions { flex-direction: column; align-items: stretch; }
+      .btn-primary, .btn-secondary { justify-content: center; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="logo">MC</div>
+      <div>
+        <h1>MobileConfig Installer</h1>
+        <div class="subtitle">Single‑file tool to install .mobileconfig profiles on iOS (Safari).</div>
+      </div>
+      <div class="badge">
+        <span></span> iOS / iPadOS
+      </div>
+    </header>
+
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-tab="file" type="button">
+        <span class="icon">📂</span> File
+      </button>
+      <button class="tab" data-tab="url" type="button">
+        <span class="icon">🌐</span> URL
+      </button>
+      <button class="tab" data-tab="xml" type="button">
+        <span class="icon">✏️</span> XML
+      </button>
+    </div>
+
+    <!-- FILE TAB -->
+    <section class="card tab-panel" data-panel="file">
+      <h2>Upload from device</h2>
+      <div class="card-desc">
+        Choose an existing <code>.mobileconfig</code> file from this device and re‑serve it
+        with the correct profile MIME type for iOS.
+      </div>
+
+      <div class="field">
+        <label for="fileInput">Profile file (.mobileconfig)</label>
+        <input id="fileInput" type="file" accept=".mobileconfig,application/x-apple-aspen-config" />
+        <div class="hint">Use Safari on iPhone/iPad for installation.</div>
+      </div>
+
+      <div class="actions">
+        <button id="btnInstallFile" class="btn-primary" type="button">
+          <span>Install profile</span> <span>📲</span>
+        </button>
+        <button id="btnClearFile" class="btn-secondary" type="button">
+          <span>Clear</span> <span>✖</span>
+        </button>
+      </div>
+
+      <div id="statusFile" class="status">
+        <div class="status-dot"></div>
+        <span>Waiting for file…</span>
+      </div>
+    </section>
+
+    <!-- URL TAB -->
+    <section class="card tab-panel" data-panel="url" style="display:none">
+      <h2>Fetch from URL</h2>
+      <div class="card-desc">
+        Enter a direct link to a <code>.mobileconfig</code> file. This page will fetch it
+        and re‑serve it with the correct MIME type.
+      </div>
+
+      <div class="field">
+        <label for="urlInput">Profile URL</label>
+        <input id="urlInput" type="url" placeholder="https://example.com/profile.mobileconfig" />
+        <div class="hint">Must be a direct file link. CORS rules still apply.</div>
+      </div>
+
+      <div class="actions">
+        <button id="btnInstallUrl" class="btn-primary" type="button">
+          <span>Fetch &amp; install</span> <span>📲</span>
+        </button>
+        <button id="btnClearUrl" class="btn-secondary" type="button">
+          <span>Clear</span> <span>✖</span>
+        </button>
+      </div>
+
+      <div id="statusUrl" class="status">
+        <div class="status-dot"></div>
+        <span>Waiting for URL…</span>
+      </div>
+    </section>
+
+    <!-- XML TAB -->
+    <section class="card tab-panel" data-panel="xml" style="display:none">
+      <h2>Paste XML code</h2>
+      <div class="card-desc">
+        Paste raw configuration profile XML. It will be wrapped into a
+        <code>.mobileconfig</code> download with the correct MIME type.
+      </div>
+
+      <div class="field">
+        <label for="xmlInput">Configuration XML</label>
+        <textarea id="xmlInput" spellcheck="false" placeholder='&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+  &lt;dict&gt;
+    ...
+  &lt;/dict&gt;
+&lt;/plist&gt;'></textarea>
+        <div class="hint">Make sure the XML is valid plist configuration.</div>
+      </div>
+
+      <div class="actions">
+        <button id="btnInstallXml" class="btn-primary" type="button">
+          <span>Generate &amp; install</span> <span>📲</span>
+        </button>
+        <button id="btnClearXml" class="btn-secondary" type="button">
+          <span>Clear</span> <span>✖</span>
+        </button>
+      </div>
+
+      <div id="statusXml" class="status">
+        <div class="status-dot"></div>
+        <span>Waiting for XML…</span>
+      </div>
+    </section>
+
+    <div class="footer">
+      <div class="pill">
+        ⚠️ Use Safari on iOS / iPadOS for profile installation.
+      </div>
+      <div>
+        <span class="warn">No server.</span> All processing happens in your browser.
+      </div>
+    </div>
+
+    <a id="hiddenDownload" style="display:none"></a>
+  </div>
+
+  <script>
+    (function () {
+      const tabs = document.querySelectorAll(".tab");
+      const panels = document.querySelectorAll(".tab-panel");
+
+      function setActiveTab(name) {
+        tabs.forEach((t) => {
+          t.classList.toggle("active", t.dataset.tab === name);
+        });
+        panels.forEach((p) => {
+          p.style.display = p.dataset.panel === name ? "block" : "none";
+        });
+      }
+
+      tabs.forEach((tab) => {
+        tab.addEventListener("click", () => setActiveTab(tab.dataset.tab));
+      });
+
+      const statusFile = document.getElementById("statusFile");
+      const statusUrl = document.getElementById("statusUrl");
+      const statusXml = document.getElementById("statusXml");
+
+      function setStatus(el, type, msg) {
+        el.classList.remove("ok", "err");
+        if (type === "ok") el.classList.add("ok");
+        if (type === "err") el.classList.add("err");
+        const span = el.querySelector("span");
+        if (span) span.innerHTML = msg;
+      }
+
+      const dl = document.getElementById("hiddenDownload");
+      function triggerDownloadFromBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        dl.href = url;
+        dl.download = filename || "profile.mobileconfig";
+        dl.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+      }
+
+      // FILE
+      const fileInput = document.getElementById("fileInput");
+      const btnInstallFile = document.getElementById("btnInstallFile");
+      const btnClearFile = document.getElementById("btnClearFile");
+
+      btnInstallFile.addEventListener("click", () => {
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) {
+          setStatus(statusFile, "err", "<strong>No file selected.</strong> Choose a .mobileconfig file first.");
+          return;
+        }
+        const reader = new FileReader();
+        btnInstallFile.disabled = true;
+        setStatus(statusFile, "ok", "Reading file…");
+        reader.onload = function (e) {
+          try {
+            const data = e.target.result;
+            const blob = new Blob([data], {
+              type: "application/x-apple-aspen-config",
+            });
+            const name = file.name && file.name.endsWith(".mobileconfig")
+              ? file.name
+              : (file.name || "profile") + ".mobileconfig";
+            triggerDownloadFromBlob(blob, name);
+            setStatus(
+              statusFile,
+              "ok",
+              "<strong>Ready.</strong> Safari should prompt to install the profile."
+            );
+          } catch (err) {
+            console.error(err);
+            setStatus(
+              statusFile,
+              "err",
+              "<strong>Error.</strong> Could not process file."
+            );
+          } finally {
+            btnInstallFile.disabled = false;
+          }
+        };
+        reader.onerror = function () {
+          btnInstallFile.disabled = false;
+          setStatus(
+            statusFile,
+            "err",
+            "<strong>Error.</strong> Failed to read file."
+          );
+        };
+        reader.readAsArrayBuffer(file);
+      });
+
+      btnClearFile.addEventListener("click", () => {
+        fileInput.value = "";
+        setStatus(statusFile, "", "Waiting for file…");
+      });
+
+      // URL
+      const urlInput = document.getElementById("urlInput");
+      const btnInstallUrl = document.getElementById("btnInstallUrl");
+      const btnClearUrl = document.getElementById("btnClearUrl");
+
+      btnInstallUrl.addEventListener("click", async () => {
+        const url = (urlInput.value || "").trim();
+        if (!url) {
+          setStatus(statusUrl, "err", "<strong>No URL.</strong> Enter a direct .mobileconfig link.");
+          return;
+        }
+        try {
+          btnInstallUrl.disabled = true;
+          setStatus(statusUrl, "ok", "Fetching profile…");
+          const res = await fetch(url, { credentials: "omit" });
+          if (!res.ok) {
+            throw new Error("HTTP " + res.status);
+          }
+          const buf = await res.arrayBuffer();
+          const blob = new Blob([buf], {
+            type: "application/x-apple-aspen-config",
+          });
+          const filenameFromUrl = (() => {
+            try {
+              const u = new URL(url);
+              const path = u.pathname.split("/").filter(Boolean).pop() || "";
+              if (path.toLowerCase().endsWith(".mobileconfig")) return path;
+              return "profile.mobileconfig";
+            } catch {
+              return "profile.mobileconfig";
+            }
+          })();
+          triggerDownloadFromBlob(blob, filenameFromUrl);
+          setStatus(
+            statusUrl,
+            "ok",
+            "<strong>Ready.</strong> Safari should prompt to install the profile."
+          );
+        } catch (err) {
+          console.error(err);
+          setStatus(
+            statusUrl,
+            "err",
+            "<strong>Error.</strong> Could not fetch profile. Check URL and CORS."
+          );
+        } finally {
+          btnInstallUrl.disabled = false;
+        }
+      });
+
+      btnClearUrl.addEventListener("click", () => {
+        urlInput.value = "";
+        setStatus(statusUrl, "", "Waiting for URL…");
+      });
+
+      // XML
+      const xmlInput = document.getElementById("xmlInput");
+      const btnInstallXml = document.getElementById("btnInstallXml");
+      const btnClearXml = document.getElementById("btnClearXml");
+
+      btnInstallXml.addEventListener("click", () => {
+        const xml = xmlInput.value.trim();
+        if (!xml) {
+          setStatus(statusXml, "err", "<strong>No XML.</strong> Paste configuration XML first.");
+          return;
+        }
+        btnInstallXml.disabled = true;
+        try {
+          const blob = new Blob([xml], {
+            type: "application/x-apple-aspen-config",
+          });
+          triggerDownloadFromBlob(blob, "profile-from-xml.mobileconfig");
+          setStatus(
+            statusXml,
+            "ok",
+            "<strong>Ready.</strong> Safari should prompt to install the profile."
+          );
+        } catch (err) {
+          console.error(err);
+          setStatus(
+            statusXml,
+            "err",
+            "<strong>Error.</strong> Could not generate profile from XML."
+          );
+        } finally {
+          btnInstallXml.disabled = false;
+        }
+      });
+
+      btnClearXml.addEventListener("click", () => {
+        xmlInput.value = "";
+        setStatus(statusXml, "", "Waiting for XML…");
+      });
+
+      // Small Safari hint if not Safari on iOS
+      (function safariHint() {
+        const ua = navigator.userAgent || "";
+        const isIOS = /iPad|iPhone|iPod/.test(ua);
+        const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+        if (!isIOS || !isSafari) return;
+        // Already in Safari on iOS – nothing extra needed.
+      })();
+    })();
+  </script>
+</body>
+</html>
