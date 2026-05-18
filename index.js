@@ -120,6 +120,51 @@ app.post("/auth/xsts", async (req, res) => {
   }
 })
 
+// Step 5: Exchange XSTS token for Minecraft Services token
+app.post("/auth/mc", async (req, res) => {
+  const { xsts_token, uhs } = req.body
+
+  if (!xsts_token || !uhs) {
+    return res.status(400).json({ error: "Missing xsts_token or uhs" })
+  }
+
+  try {
+    const mcRes = await fetch("https://api.minecraftservices.com/authentication/login_with_xbox", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        identityToken: `XBL3.0 x=${uhs};${xsts_token}`
+      })
+    })
+
+    const mcJson = await mcRes.json()
+
+    if (!mcJson.access_token) {
+      return res.status(400).json({ error: "Minecraft auth failed", details: mcJson })
+    }
+
+    const profileRes = await fetch("https://api.minecraftservices.com/minecraft/profile", {
+      headers: {
+        "Authorization": `Bearer ${mcJson.access_token}`
+      }
+    })
+
+    const profileJson = await profileRes.json()
+
+    res.json({
+      mc_access_token: mcJson.access_token,
+      profile: profileJson
+    })
+
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: "Minecraft Services auth failed" })
+  }
+})
+
 // Keep server alive on Render
 app.listen(process.env.PORT || 3000, () => {
   console.log("Auth backend running")
