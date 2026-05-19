@@ -1,21 +1,71 @@
 import express from "express"
 import fetch from "node-fetch"
 import cors from "cors"
+import rateLimit from "express-rate-limit"
 
 const app = express()
-app.use(cors())
+
+// -------------------------------
+// 1. STRICT CORS (ONLY YOUR DOMAIN)
+// -------------------------------
+const allowedOrigins = [
+  "https://bowslicegames-svg.github.io",
+  "https://bowslicegames-svg.github.io/MinecraftWebClient"
+]
+
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin) return cb(new Error("Blocked: No origin"))
+    if (allowedOrigins.includes(origin)) return cb(null, true)
+    return cb(new Error("Blocked by CORS"))
+  }
+}))
+
+// -------------------------------
+// 2. ORIGIN + REFERER ENFORCEMENT
+// -------------------------------
+function enforceFrontend(req, res, next) {
+  const origin = req.headers.origin || ""
+  const referer = req.headers.referer || ""
+
+  const allowed =
+    origin.startsWith("https://bowslicegames-svg.github.io") ||
+    referer.startsWith("https://bowslicegames-svg.github.io")
+
+  if (!allowed) {
+    return res.status(403).json({ error: "Forbidden: Invalid origin" })
+  }
+
+  next()
+}
+
 app.use(express.json())
 
-// Environment variables from Render
+// -------------------------------
+// 3. RATE LIMITING (PREVENT ABUSE)
+// -------------------------------
+const authLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+app.use("/auth", authLimiter)
+
+// -------------------------------
+// ENVIRONMENT VARIABLES
+// -------------------------------
 const CLIENT_ID = process.env.CLIENT_ID
 const CLIENT_SECRET = process.env.CLIENT_SECRET
 const REDIRECT_URI = process.env.REDIRECT_URI
 
-// Where the user should be sent after login
 const FRONTEND_RETURN = "https://bowslicegames-svg.github.io/MinecraftWebClient/"
 
-// Step 1: Redirect user to Microsoft login
-app.get("/auth/login", (req, res) => {
+// -------------------------------
+// STEP 1: MICROSOFT LOGIN REDIRECT
+// -------------------------------
+app.get("/auth/login", enforceFrontend, (req, res) => {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
@@ -29,7 +79,9 @@ app.get("/auth/login", (req, res) => {
   )
 })
 
-// Step 2: Microsoft redirects back here with ?code=
+// -------------------------------
+// STEP 2: MICROSOFT CALLBACK
+// -------------------------------
 app.get("/auth/callback", async (req, res) => {
   const code = req.query.code
   if (!code) return res.status(400).send("Missing code")
@@ -52,14 +104,12 @@ app.get("/auth/callback", async (req, res) => {
 
     const tokenJson = await tokenRes.json()
 
-    // If Microsoft returned an error, send user back with error message
     if (tokenJson.error) {
       return res.redirect(
         `${FRONTEND_RETURN}?error=${encodeURIComponent(tokenJson.error_description)}`
       )
     }
 
-    // Redirect back to GitHub Pages with the token
     const redirectUrl =
       `${FRONTEND_RETURN}?ms_token=` +
       encodeURIComponent(JSON.stringify(tokenJson))
@@ -72,8 +122,10 @@ app.get("/auth/callback", async (req, res) => {
   }
 })
 
-// Step 3: Exchange Microsoft access token for Xbox Live token
-app.post("/auth/xbl", async (req, res) => {
+// -------------------------------
+// STEP 3: XBOX LIVE AUTH
+// -------------------------------
+app.post("/auth/xbl", enforceFrontend, async (req, res) => {
   const { access_token } = req.body
   if (!access_token) return res.status(400).json({ error: "Missing access_token" })
 
@@ -103,8 +155,10 @@ app.post("/auth/xbl", async (req, res) => {
   }
 })
 
-// Step 4: Exchange Xbox Live token for XSTS token
-app.post("/auth/xsts", async (req, res) => {
+// -------------------------------
+// STEP 4: XSTS AUTH
+// -------------------------------
+app.post("/auth/xsts", enforceFrontend, async (req, res) => {
   const { xbl_token, uhs } = req.body
 
   if (!xbl_token || !uhs) {
@@ -137,8 +191,10 @@ app.post("/auth/xsts", async (req, res) => {
   }
 })
 
-// Step 5: Exchange XSTS token for Minecraft Services token
-app.post("/auth/mc", async (req, res) => {
+// -------------------------------
+// STEP 5: MINECRAFT SERVICES AUTH
+// -------------------------------
+app.post("/auth/mc", enforceFrontend, async (req, res) => {
   const { xsts_token, uhs } = req.body
 
   if (!xsts_token || !uhs) {
@@ -182,7 +238,9 @@ app.post("/auth/mc", async (req, res) => {
   }
 })
 
-// Keep server alive on Render
+// -------------------------------
+// SERVER START
+// -------------------------------
 app.listen(process.env.PORT || 3000, () => {
-  console.log("Auth backend running")
+  console.log("Auth backend running (locked down)")
 })
