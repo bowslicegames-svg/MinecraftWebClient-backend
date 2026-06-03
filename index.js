@@ -15,8 +15,11 @@ const allowedOrigins = [
 
 app.use(cors({
   origin(origin, cb) {
-    if (!origin) return cb(null, true) // allow Render health checks
+    // Allow Render health checks + Microsoft OAuth redirects
+    if (!origin) return cb(null, true)
+
     if (allowedOrigins.includes(origin)) return cb(null, true)
+
     return cb(new Error("Blocked by CORS"))
   }
 }))
@@ -33,7 +36,8 @@ function enforceFrontend(req, res, next) {
   const origin = req.headers.origin || ""
   const referer = req.headers.referer || ""
 
-  if (!origin && !referer) return next() // allow Render health checks
+  // Allow Render health checks
+  if (!origin && !referer) return next()
 
   const allowed =
     origin.startsWith("https://bowslicegames-svg.github.io") ||
@@ -46,7 +50,13 @@ function enforceFrontend(req, res, next) {
   next()
 }
 
-app.use(enforceFrontend)
+// -------------------------------
+// 3B. BYPASS enforceFrontend ONLY for /auth/callback
+// -------------------------------
+app.use((req, res, next) => {
+  if (req.path === "/auth/callback") return next()
+  return enforceFrontend(req, res, next)
+})
 
 // -------------------------------
 // 4. RATE LIMITING
