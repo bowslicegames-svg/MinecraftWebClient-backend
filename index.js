@@ -3,38 +3,36 @@ import fetch from "node-fetch"
 import cors from "cors"
 
 const app = express()
-app.use(express.json())
 
-// -----------------------------
-// CONFIG
-// -----------------------------
-const CLIENT_ID = process.env.CLIENT_ID
-const CLIENT_SECRET = process.env.CLIENT_SECRET
-const REDIRECT_URI = "https://minecraftwebclient-backend.onrender.com/auth/callback"
+// ✅ CORS: allow your GitHub Pages + local dev
+const allowedOrigins = [
+  "https://bowslicegames-svg.github.io",
+  "http://localhost:5173",
+  "http://localhost:4173"
+]
 
-const FRONTEND = "https://bowslicegames-svg.github.io"
-
-// -----------------------------
-// CORS — allow ONLY your GitHub Pages
-// -----------------------------
 app.use((req, res, next) => {
   const origin = req.headers.origin
-
-  if (!origin) return next()
-
-  if (origin === FRONTEND) {
-    res.setHeader("Access-Control-Allow-Origin", origin)
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type")
-    return next()
+  if (origin && allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin)
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    res.header("Access-Control-Allow-Headers", "Content-Type")
   }
-
-  return res.status(403).json({ error: "Forbidden: Invalid origin" })
+  if (req.method === "OPTIONS") return res.sendStatus(200)
+  next()
 })
 
-// -----------------------------
-// Microsoft Login Redirect
-// -----------------------------
+app.use(express.json())
+
+// 🔐 Environment variables from Render
+const CLIENT_ID = process.env.CLIENT_ID
+const CLIENT_SECRET = process.env.CLIENT_SECRET
+const REDIRECT_URI = process.env.REDIRECT_URI
+
+// 🌐 Where the user should be sent after login
+const FRONTEND_RETURN = "https://bowslicegames-svg.github.io/MinecraftWebClient/"
+
+// STEP 1: Redirect user to Microsoft login
 app.get("/auth/login", (req, res) => {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -49,17 +47,10 @@ app.get("/auth/login", (req, res) => {
   )
 })
 
-// -----------------------------
-// Microsoft OAuth Callback
-// -----------------------------
+// STEP 2: Microsoft redirects back here with ?code=
 app.get("/auth/callback", async (req, res) => {
   const code = req.query.code
-
-  if (!code) {
-    return res.redirect(
-      FRONTEND + "/MinecraftWebClient/?error=missing_code"
-    )
-  }
+  if (!code) return res.status(400).send("Missing code")
 
   try {
     const tokenRes = await fetch(
@@ -79,47 +70,48 @@ app.get("/auth/callback", async (req, res) => {
 
     const tokenJson = await tokenRes.json()
 
-    if (!tokenJson.access_token) {
+    if (tokenJson.error) {
       return res.redirect(
-        FRONTEND +
-          "/MinecraftWebClient/?error=" +
-          encodeURIComponent(JSON.stringify(tokenJson))
+        `${FRONTEND_RETURN}?error=${encodeURIComponent(
+          tokenJson.error_description || tokenJson.error
+        )}`
       )
     }
 
-    const encoded = encodeURIComponent(JSON.stringify(tokenJson))
+    const redirectUrl =
+      `${FRONTEND_RETURN}?ms_token=` +
+      encodeURIComponent(JSON.stringify(tokenJson))
 
-    return res.redirect(
-      FRONTEND + "/MinecraftWebClient/?ms_token=" + encoded
-    )
+    return res.redirect(redirectUrl)
   } catch (err) {
     console.error(err)
-    return res.redirect(
-      FRONTEND + "/MinecraftWebClient/?error=callback_failure"
-    )
+    res.status(500).json({ error: "Auth failed" })
   }
 })
 
-// -----------------------------
-// Xbox Live Authentication
-// -----------------------------
+// STEP 3: Exchange Microsoft access token for Xbox Live token
 app.post("/auth/xbl", async (req, res) => {
   const { access_token } = req.body
+  if (!access_token)
+    return res.status(400).json({ error: "Missing access_token" })
 
   try {
     const xblRes = await fetch(
       "https://user.auth.xboxlive.com/user/authenticate",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
         body: JSON.stringify({
-          RelyingParty: "http://auth.xboxlive.com",
-          TokenType: "JWT",
           Properties: {
             AuthMethod: "RPS",
             SiteName: "user.auth.xboxlive.com",
             RpsTicket: `d=${access_token}`
-          }
+          },
+          RelyingParty: "http://auth.xboxlive.com",
+          TokenType: "JWT"
         })
       }
     )
@@ -128,29 +120,34 @@ app.post("/auth/xbl", async (req, res) => {
     res.json(xblJson)
   } catch (err) {
     console.error(err)
-    res.status(500).json({ error: "XBL auth failed" })
+    res.status(500).json({ error: "Xbox Live auth failed" })
   }
 })
 
-// -----------------------------
-// XSTS Authorization
-// -----------------------------
+// STEP 4: Exchange Xbox Live token for XSTS token
 app.post("/auth/xsts", async (req, res) => {
   const { xbl_token, uhs } = req.body
+
+  if (!xbl_token || !uhs) {
+    return res.status(400).json({ error: "Missing xbl_token or uhs" })
+  }
 
   try {
     const xstsRes = await fetch(
       "https://xsts.auth.xboxlive.com/xsts/authorize",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json"
+        },
         body: JSON.stringify({
-          RelyingParty: "rp://api.minecraftservices.com/",
-          TokenType: "JWT",
           Properties: {
             SandboxId: "RETAIL",
             UserTokens: [xbl_token]
-          }
+          },
+          RelyingParty: "rp://api.minecraftservices.com/",
+          TokenType: "JWT"
         })
       }
     )
@@ -163,9 +160,7 @@ app.post("/auth/xsts", async (req, res) => {
   }
 })
 
-// -----------------------------
-// Minecraft Authentication
-// -----------------------------
+// STEP 5: Exchange XSTS token for Minecraft Services token
 app.post("/auth/mc", async (req, res) => {
   const { xsts_token, uhs } = req.body
 
@@ -174,7 +169,6 @@ app.post("/auth/mc", async (req, res) => {
   }
 
   const identityToken = `XBL3.0 x=${uhs};${xsts_token}`
-
   console.log("identityToken:", identityToken)
 
   try {
@@ -193,10 +187,9 @@ app.post("/auth/mc", async (req, res) => {
     const mcJson = await mcRes.json()
 
     if (!mcJson.access_token) {
-      return res.status(400).json({
-        error: "Minecraft auth failed",
-        details: mcJson
-      })
+      return res
+        .status(400)
+        .json({ error: "Minecraft auth failed", details: mcJson })
     }
 
     const profileRes = await fetch(
@@ -220,5 +213,7 @@ app.post("/auth/mc", async (req, res) => {
   }
 })
 
-// -----------------------------
-app.listen(3000, () => console.log("Backend running"))
+// Keep server alive on Render
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Auth backend running")
+})
