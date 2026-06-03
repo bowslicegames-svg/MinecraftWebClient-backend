@@ -15,11 +15,8 @@ const allowedOrigins = [
 
 app.use(cors({
   origin(origin, cb) {
-    // Allow Render health checks + server-to-server requests
-    if (!origin) return cb(null, true)
-
+    if (!origin) return cb(null, true) // allow Render health checks
     if (allowedOrigins.includes(origin)) return cb(null, true)
-
     return cb(new Error("Blocked by CORS"))
   }
 }))
@@ -30,14 +27,13 @@ app.use(cors({
 app.use(express.json())
 
 // -------------------------------
-// 3. ORIGIN + REFERER ENFORCEMENT (Render‑safe)
+// 3. ORIGIN + REFERER ENFORCEMENT
 // -------------------------------
 function enforceFrontend(req, res, next) {
   const origin = req.headers.origin || ""
   const referer = req.headers.referer || ""
 
-  // Allow Render health checks
-  if (!origin && !referer) return next()
+  if (!origin && !referer) return next() // allow Render health checks
 
   const allowed =
     origin.startsWith("https://bowslicegames-svg.github.io") ||
@@ -160,6 +156,7 @@ app.post("/auth/xbl", async (req, res) => {
 
     const xblJson = await xblRes.json()
     res.json(xblJson)
+
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: "Xbox Live auth failed" })
@@ -250,7 +247,7 @@ app.post("/auth/mc", async (req, res) => {
 })
 
 // -------------------------------
-// SERVER START (Render‑safe)
+// SERVER START
 // -------------------------------
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
