@@ -6,7 +6,7 @@ import rateLimit from "express-rate-limit"
 const app = express()
 
 // -------------------------------
-// 1. STRICT CORS (Render‑safe)
+// 1. STRICT CORS (ONLY YOUR DOMAIN)
 // -------------------------------
 const allowedOrigins = [
   "https://bowslicegames-svg.github.io",
@@ -15,24 +15,18 @@ const allowedOrigins = [
 
 app.use(cors({
   origin(origin, cb) {
-    // Allow Render health checks
-    if (!origin) return cb(null, true)
-
+    if (!origin) return cb(new Error("Blocked: No origin"))
     if (allowedOrigins.includes(origin)) return cb(null, true)
-
     return cb(new Error("Blocked by CORS"))
   }
 }))
 
 // -------------------------------
-// 2. ORIGIN + REFERER ENFORCEMENT (Render‑safe)
+// 2. ORIGIN + REFERER ENFORCEMENT
 // -------------------------------
 function enforceFrontend(req, res, next) {
   const origin = req.headers.origin || ""
   const referer = req.headers.referer || ""
-
-  // Allow Render health checks
-  if (!origin && !referer) return next()
 
   const allowed =
     origin.startsWith("https://bowslicegames-svg.github.io") ||
@@ -48,7 +42,7 @@ function enforceFrontend(req, res, next) {
 app.use(express.json())
 
 // -------------------------------
-// 3. RATE LIMITING
+// 3. RATE LIMITING (PREVENT ABUSE)
 // -------------------------------
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -247,7 +241,6 @@ app.post("/auth/mc", enforceFrontend, async (req, res) => {
 // -------------------------------
 // SERVER START
 // -------------------------------
-const PORT = process.env.PORT || 3000
-app.listen(PORT, () => {
-  console.log("Auth backend running on port", PORT)
-})
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Auth backend running (locked down)")
+})  
