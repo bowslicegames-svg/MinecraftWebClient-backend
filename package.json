@@ -1,15 +1,13 @@
 {
-  "name": "mc-auth-backend",
-  "version": "1.0.0",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "node-fetch": "^3.3.2",
-    "express-rate-limit": "^7.0.0",
-    "cors": "^2.8.5"
+  "name":"mc-auth-backend",
+  "type":"module",
+  "main":"index.js",
+  "scripts":{"start":"node index.js"},
+  "dependencies":{
+    "express":"^4.18.2",
+    "node-fetch":"^3.3.2",
+    "cors":"^2.8.5",
+    "body-parser":"^1.20.3",
+    "oci-sdk":"^2.74.0"
   }
 }
