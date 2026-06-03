@@ -25,7 +25,12 @@ app.use(cors({
 }))
 
 // -------------------------------
-// 2. ORIGIN + REFERER ENFORCEMENT (Render‑safe)
+// 2. JSON BODY PARSER (must be BEFORE enforceFrontend)
+// -------------------------------
+app.use(express.json())
+
+// -------------------------------
+// 3. ORIGIN + REFERER ENFORCEMENT (Render‑safe)
 // -------------------------------
 function enforceFrontend(req, res, next) {
   const origin = req.headers.origin || ""
@@ -45,10 +50,10 @@ function enforceFrontend(req, res, next) {
   next()
 }
 
-app.use(express.json())
+app.use(enforceFrontend)
 
 // -------------------------------
-// 3. RATE LIMITING
+// 4. RATE LIMITING
 // -------------------------------
 const authLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -71,7 +76,7 @@ const FRONTEND_RETURN = "https://bowslicegames-svg.github.io/MinecraftWebClient/
 // -------------------------------
 // STEP 1: MICROSOFT LOGIN REDIRECT
 // -------------------------------
-app.get("/auth/login", enforceFrontend, (req, res) => {
+app.get("/auth/login", (req, res) => {
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     response_type: "code",
@@ -131,7 +136,7 @@ app.get("/auth/callback", async (req, res) => {
 // -------------------------------
 // STEP 3: XBOX LIVE AUTH
 // -------------------------------
-app.post("/auth/xbl", enforceFrontend, async (req, res) => {
+app.post("/auth/xbl", async (req, res) => {
   const { access_token } = req.body
   if (!access_token) return res.status(400).json({ error: "Missing access_token" })
 
@@ -164,7 +169,7 @@ app.post("/auth/xbl", enforceFrontend, async (req, res) => {
 // -------------------------------
 // STEP 4: XSTS AUTH
 // -------------------------------
-app.post("/auth/xsts", enforceFrontend, async (req, res) => {
+app.post("/auth/xsts", async (req, res) => {
   const { xbl_token, uhs } = req.body
 
   if (!xbl_token || !uhs) {
@@ -200,7 +205,7 @@ app.post("/auth/xsts", enforceFrontend, async (req, res) => {
 // -------------------------------
 // STEP 5: MINECRAFT SERVICES AUTH
 // -------------------------------
-app.post("/auth/mc", enforceFrontend, async (req, res) => {
+app.post("/auth/mc", async (req, res) => {
   const { xsts_token, uhs } = req.body
 
   if (!xsts_token || !uhs) {
