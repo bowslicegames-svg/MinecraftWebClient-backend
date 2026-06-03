@@ -212,64 +212,89 @@ app.post("/auth/mc", async (req, res) => {
     res.status(500).json({ error: "Minecraft Services auth failed" })
   }
 })
+
 // =========================
 //  VM + INPUT CONTROL API
 // =========================
 
-// Your VM's public IP (set this in Render env vars)
-const VM_IP = process.env.VM_IP;
-
-// Sunshine input endpoint (you will install a small agent later)
-const VM_INPUT_URL = `http://${VM_IP}:47990/input`; // example port
+// Your VM's public IP (for now this is YOUR Oracle VM)
+const VM_IP = process.env.VM_IP
+const VM_INPUT_URL = `http://${VM_IP}:47990/input` // example agent endpoint
 
 async function sendToVm(path, payload) {
+  if (!VM_IP) {
+    console.error("VM_IP not set")
+    return
+  }
   try {
     await fetch(`${VM_INPUT_URL}/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    });
+    })
   } catch (err) {
-    console.error("VM input error:", err);
+    console.error("VM input error:", err)
   }
 }
 
 // --- Movement ---
 app.post("/move", async (req, res) => {
-  const { x, y } = req.body;
-  await sendToVm("move", { x, y });
-  res.sendStatus(200);
-});
+  const { x, y } = req.body || {}
+  await sendToVm("move", { x: x || 0, y: y || 0 })
+  res.sendStatus(200)
+})
 
 // --- Look ---
 app.post("/look", async (req, res) => {
-  const { dx, dy } = req.body;
-  await sendToVm("look", { dx, dy });
-  res.sendStatus(200);
-});
+  const { dx, dy } = req.body || {}
+  await sendToVm("look", { dx: dx || 0, dy: dy || 0 })
+  res.sendStatus(200)
+})
 
 // --- Key press ---
 app.post("/key", async (req, res) => {
-  const { key } = req.body;
-  await sendToVm("key", { key });
-  res.sendStatus(200);
-});
+  const { key } = req.body || {}
+  if (key) await sendToVm("key", { key })
+  res.sendStatus(200)
+})
 
 // --- Text input ---
 app.post("/text", async (req, res) => {
-  const { text } = req.body;
-  await sendToVm("text", { text });
-  res.sendStatus(200);
-});
+  const { text } = req.body || {}
+  if (text) await sendToVm("text", { text })
+  res.sendStatus(200)
+})
 
-// --- VM control (Phase 2) ---
+// --- VM control (Phase 2 stub) ---
 app.post("/vm/start", async (req, res) => {
-  res.json({ status: "stub", message: "VM start not implemented yet" });
-});
+  res.json({ status: "stub", message: "VM start not implemented yet" })
+})
 
 app.get("/vm/status", async (req, res) => {
-  res.json({ status: "stub", message: "VM status not implemented yet" });
-});
+  res.json({ status: "stub", message: "VM status not implemented yet" })
+})
+
+// =========================
+//  ORACLE CONFIG (stub)
+// =========================
+
+// In-memory demo store (per-process). Replace with DB later.
+let oracleConfigEncrypted = null
+
+app.post("/oracle/config", (req, res) => {
+  const { config } = req.body || {}
+  if (!config) return res.status(400).json({ error: "Missing config" })
+
+  // For now, just store raw. Later: encrypt + per-user.
+  oracleConfigEncrypted = config
+  console.log("Received OCI config (length):", config.length)
+
+  res.json({ ok: true })
+})
+
+app.get("/oracle/config/status", (req, res) => {
+  res.json({ saved: !!oracleConfigEncrypted })
+})
 
 // Keep server alive on Render
 app.listen(process.env.PORT || 3000, () => {
