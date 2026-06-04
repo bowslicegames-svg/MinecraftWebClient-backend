@@ -1,6 +1,9 @@
 import express from "express"
 import fetch from "node-fetch"
 import cors from "cors"
+import pkg from "pg"
+
+const { Pool } = pkg
 
 const app = express()
 
@@ -31,6 +34,17 @@ const REDIRECT_URI = process.env.REDIRECT_URI
 
 // 🌐 Where the user should be sent after login
 const FRONTEND_RETURN = "https://bowslicegames-svg.github.io/MinecraftWebClient/"
+
+// 🗄️ Postgres (Render provides DATABASE_URL)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+})
+
+// For now: single demo user. Later: replace with real auth user id.
+function getUserId(req) {
+  return "demo-user"
+}
 
 // STEP 1: Redirect user to Microsoft login
 app.get("/auth/login", (req, res) => {
@@ -214,20 +228,110 @@ app.post("/auth/mc", async (req, res) => {
 })
 
 // =========================
+//  ORACLE CONFIG + VM IP (Postgres)
+// =========================
+
+// Save OCI config (for now: raw text, per demo user)
+app.post("/oracle/config", async (req, res) => {
+  const { config } = req.body || {}
+  if (!config) return res.status(400).json({ error: "Missing config" })
+
+  const userId = getUserId(req)
+
+  try {
+    await pool.query(
+      `
+      INSERT INTO oracle_accounts (user_id, oci_config)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET oci_config = EXCLUDED.oci_config
+      `,
+      [userId, config]
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    console.error("oracle/config error:", err)
+    res.status(500).json({ error: "Failed to save config" })
+  }
+})
+
+app.get("/oracle/config/status", async (req, res) => {
+  const userId = getUserId(req)
+  try {
+    const { rows } = await pool.query(
+      "SELECT 1 FROM oracle_accounts WHERE user_id = $1",
+      [userId]
+    )
+    res.json({ saved: rows.length > 0 })
+  } catch (err) {
+    console.error("oracle/config/status error:", err)
+    res.status(500).json({ error: "Failed to check status" })
+  }
+})
+
+// Get VM IP for this user (used by client.html)
+app.get("/oracle/vm", async (req, res) => {
+  const userId = getUserId(req)
+  try {
+    const { rows } = await pool.query(
+      "SELECT vm_ip FROM oracle_accounts WHERE user_id = $1",
+      [userId]
+    )
+    if (!rows.length || !rows[0].vm_ip) {
+      return res.status(404).json({ error: "No VM IP stored yet" })
+    }
+    res.json({ ip: rows[0].vm_ip })
+  } catch (err) {
+    console.error("/oracle/vm error:", err)
+    res.status(500).json({ error: "Failed to get VM IP" })
+  }
+})
+
+// (Later) when you create a VM via OCI, you’ll call this to save its IP:
+app.post("/oracle/vm", async (req, res) => {
+  const { ip } = req.body || {}
+  if (!ip) return res.status(400).json({ error: "Missing ip" })
+  const userId = getUserId(req)
+  try {
+    await pool.query(
+      `
+      UPDATE oracle_accounts
+      SET vm_ip = $2
+      WHERE user_id = $1
+      `,
+      [userId, ip]
+    )
+    res.json({ ok: true })
+  } catch (err) {
+    console.error("POST /oracle/vm error:", err)
+    res.status(500).json({ error: "Failed to save VM IP" })
+  }
+})
+
+// =========================
 //  VM + INPUT CONTROL API
 // =========================
 
-// Your VM's public IP (for now this is YOUR Oracle VM)
-const VM_IP = process.env.VM_IP
-const VM_INPUT_URL = `http://${VM_IP}:47990/input` // example agent endpoint
+// Helper: get VM IP for current user
+async function getVmIpForUser(req) {
+  const userId = getUserId(req)
+  const { rows } = await pool.query(
+    "SELECT vm_ip FROM oracle_accounts WHERE user_id = $1",
+    [userId]
+  )
+  if (!rows.length) return null
+  return rows[0].vm_ip
+}
 
-async function sendToVm(path, payload) {
-  if (!VM_IP) {
-    console.error("VM_IP not set")
+async function sendToVm(req, path, payload) {
+  const ip = await getVmIpForUser(req)
+  if (!ip) {
+    console.error("No VM IP for user")
     return
   }
+  const url = `http://${ip}:47990/input/${path}`
   try {
-    await fetch(`${VM_INPUT_URL}/${path}`, {
+    await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -240,60 +344,38 @@ async function sendToVm(path, payload) {
 // --- Movement ---
 app.post("/move", async (req, res) => {
   const { x, y } = req.body || {}
-  await sendToVm("move", { x: x || 0, y: y || 0 })
+  await sendToVm(req, "move", { x: x || 0, y: y || 0 })
   res.sendStatus(200)
 })
 
 // --- Look ---
 app.post("/look", async (req, res) => {
   const { dx, dy } = req.body || {}
-  await sendToVm("look", { dx: dx || 0, dy: dy || 0 })
+  await sendToVm(req, "look", { dx: dx || 0, dy: dy || 0 })
   res.sendStatus(200)
 })
 
 // --- Key press ---
 app.post("/key", async (req, res) => {
   const { key } = req.body || {}
-  if (key) await sendToVm("key", { key })
+  if (key) await sendToVm(req, "key", { key })
   res.sendStatus(200)
 })
 
 // --- Text input ---
 app.post("/text", async (req, res) => {
   const { text } = req.body || {}
-  if (text) await sendToVm("text", { text })
+  if (text) await sendToVm(req, "text", { text })
   res.sendStatus(200)
 })
 
-// --- VM control (Phase 2 stub) ---
+// --- VM control (still stubbed for now) ---
 app.post("/vm/start", async (req, res) => {
   res.json({ status: "stub", message: "VM start not implemented yet" })
 })
 
 app.get("/vm/status", async (req, res) => {
   res.json({ status: "stub", message: "VM status not implemented yet" })
-})
-
-// =========================
-//  ORACLE CONFIG (stub)
-// =========================
-
-// In-memory demo store (per-process). Replace with DB later.
-let oracleConfigEncrypted = null
-
-app.post("/oracle/config", (req, res) => {
-  const { config } = req.body || {}
-  if (!config) return res.status(400).json({ error: "Missing config" })
-
-  // For now, just store raw. Later: encrypt + per-user.
-  oracleConfigEncrypted = config
-  console.log("Received OCI config (length):", config.length)
-
-  res.json({ ok: true })
-})
-
-app.get("/oracle/config/status", (req, res) => {
-  res.json({ saved: !!oracleConfigEncrypted })
 })
 
 // Keep server alive on Render
